@@ -13,10 +13,10 @@ resource "aws_iam_user_policy" "dynamodb_policy" {
   user = aws_iam_user.dynamodb_user.name
 
   policy = jsonencode({
-    "Sid": "Statement1",
     Version = "2012-10-17"
     Statement = [
       {
+        Sid = "Statement1"
         Effect = "Allow"
         Action = [
           "dynamodb:PutItem",
@@ -27,7 +27,7 @@ resource "aws_iam_user_policy" "dynamodb_policy" {
           "dynamodb:Query",
           "dynamodb:ListTables"
         ]
-        Resource = [aws_dynamodb_table.pass-storage.arn]
+        Resource = aws_dynamodb_table.pass-storage.arn
       }
     ]
   })
