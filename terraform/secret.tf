@@ -1,6 +1,7 @@
 resource "aws_secretsmanager_secret" "passgobbler-tester-access-keys" {
-  name        = "passgobblers-tester-ak"
+  name        = "passgobblers-tester-keys"
   description = "contains the access key and secret key for passgobbler api call"
+  recovery_window_in_days = 0
 }
 
 locals {
