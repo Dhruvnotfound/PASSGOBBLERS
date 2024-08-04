@@ -16,7 +16,7 @@ resource "aws_iam_user_policy" "dynamodb_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid = "Statement1"
+        Sid    = "Statement1"
         Effect = "Allow"
         Action = [
           "dynamodb:PutItem",
