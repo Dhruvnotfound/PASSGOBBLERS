@@ -18,8 +18,8 @@ import { DynamoDBDocumentClient, ScanCommand, PutCommand, DeleteCommand } from "
 const client = new DynamoDBClient({
   region: "us-east-1", // e.g., 'us-west-2' // use variable pls
   credentials: {
-    accessKeyId: import.meta.env.AWS_ACCESS_KEY_ID, // change later to use backend instead of this 
-    secretAccessKey: import.meta.env.AWS_SECRET_ACCESS_KEY// change later to use backend instead of this
+    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID, // change later to use backend instead of this 
+    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY// change later to use backend instead of this
   }
 });
 
