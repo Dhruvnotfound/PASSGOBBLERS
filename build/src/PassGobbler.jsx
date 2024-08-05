@@ -11,7 +11,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import logo from "./logo.png";
-import CryptoJS from 'crypto-js';
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, ScanCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 
@@ -28,14 +27,63 @@ const docClient = DynamoDBDocumentClient.from(client);
 // Encryption key (in a real-world scenario, this should be securely managed)
 const ENCRYPTION_KEY = import.meta.env.ENCRYPTION_KEY; // change later to use backend instead of this
 
-const encryptPassword = (password) => {
-  return CryptoJS.AES.encrypt(password, ENCRYPTION_KEY).toString();
-};
+async function deriveKey(salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    enc.encode(ENCRYPTION_KEY),
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits", "deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode(salt),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
 
-const decryptPassword = (encryptedPassword) => {
-  const bytes = CryptoJS.AES.decrypt(encryptedPassword, ENCRYPTION_KEY);
-  return bytes.toString(CryptoJS.enc.Utf8);
-};
+// Encryption function
+async function encryptPassword(password) {
+  const enc = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(salt);
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    enc.encode(password)
+  );
+  const encryptedContent = new Uint8Array(encrypted);
+  const result = new Uint8Array(salt.length + iv.length + encryptedContent.length);
+  result.set(salt, 0);
+  result.set(iv, salt.length);
+  result.set(encryptedContent, salt.length + iv.length);
+  return btoa(String.fromCharCode.apply(null, result));
+}
+
+// Decryption function
+async function decryptPassword(encryptedPassword) {
+  const dec = new TextDecoder();
+  const dataArray = Uint8Array.from(atob(encryptedPassword), c => c.charCodeAt(0));
+  const salt = dataArray.slice(0, 16);
+  const iv = dataArray.slice(16, 28);
+  const data = dataArray.slice(28);
+  const key = await deriveKey(salt);
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    data
+  );
+  return dec.decode(decrypted);
+}
 
 const FloatingSymbol = React.memo(({ symbol, style }) => (
   <div
@@ -100,10 +148,10 @@ const PassGobbler = () => {
     try {
       const command = new ScanCommand(params);
       const result = await docClient.send(command);
-      const decryptedPasswords = result.Items.map(item => ({
+      const decryptedPasswords = await Promise.all(result.Items.map(async item => ({
         ...item,
-        password: decryptPassword(item.password)
-      }));
+        password: await decryptPassword(item.password)
+      })));
       setPasswords(decryptedPasswords);
     } catch (error) {
       console.error("Error fetching passwords:", error);
@@ -124,7 +172,7 @@ const PassGobbler = () => {
 
   const addPassword = async () => {
     if (newSite && newUsername && newPassword) {
-      const encryptedPassword = encryptPassword(newPassword);
+      const encryptedPassword = await encryptPassword(newPassword);
       const newItem = {
         site: newSite,
         username: newUsername,
